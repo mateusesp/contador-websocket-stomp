@@ -3,8 +3,8 @@
 Servidor backend em Java e Spring Boot para gerenciar salas de jogos multiplayer em tempo real usando WebSocket e protocolo STOMP. O estado do sistema é gerenciado inteiramente em memória de forma thread-safe.
 
 ## Requisitos e Stack
-- Java 17+
-- Spring Boot 3.3.0 (Web e WebSocket)
+- Java 21
+- Spring Boot 3.3.0
 - Maven
 
 ## Como rodar o projeto
@@ -19,7 +19,7 @@ O servidor vai rodar na porta `8080`.
 ## Como rodar o simulador de concorrência (Testes)
 
 Um dos simuladores de concorrência foi escrito como um teste de integração JUnit (`SimuladorConcorrenciaTest`). Ele é executado em 2 steps:
-1. **Entrada concorrente na mesma sala**: Cria 20 conexões simultâneas, onde os jogadores estão tentando entrar em uma sala com capacidade de 5 jogadores. Porém somente 5 acessam a sala.
+1. **Entrada concorrente na mesma sala**: Cria 20 conexões simultâneas, onde os jogadores estão tentando entrar em uma sala com capacidade de 5 jogadores. Porém, somente 5 acessam a sala.
 2. **Incrementos simultâneos (contador)**: Os jogadores ficam enviando requisições de incremento no botão de forma paralela até atingir 250 cliques no total.
 
 Para rodar os testes:
