@@ -1,0 +1,32 @@
+# Target directory (Maven build output)
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.project
+.classpath
+.settings/
+.metadata/
+bin/
+
+# NetBeans
+nbproject/
+nb-configuration.xml
+
+# VS Code
+.vscode/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Maven Wrapper Jar (if any)
+.mvn/wrapper/maven-wrapper.jar
+
+# Log files
+*.log

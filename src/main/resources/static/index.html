@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Multiplayer Game - Shared Counter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-color: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.4);
+            --success-color: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.4);
+            --danger-color: #ef4444;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top, #1e293b, var(--bg-color));
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 24px;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(16px);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background: rgba(255, 255, 255, 0.07);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 14px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px var(--accent-glow);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            box-shadow: none;
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .room-badge {
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .room-badge:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .status-badge {
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-waiting {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .status-started {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-color);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            box-shadow: 0 0 10px var(--success-glow);
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: pulse-animation 1.5s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.8;
+            }
+        }
+
+        .counter-section {
+            text-align: center;
+            margin: 32px 0;
+        }
+
+        .counter-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+
+        .counter-value {
+            font-size: 72px;
+            font-weight: 800;
+            line-height: 1;
+            background: linear-gradient(135deg, #ffffff, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+            transition: transform 0.1s ease;
+        }
+
+        .counter-value.bump {
+            transform: scale(1.15);
+        }
+
+        .click-btn {
+            height: 120px;
+            width: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #3b82f6, #1d4ed8);
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin: 24px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+            transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .click-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 30px rgba(59, 130, 246, 0.7);
+        }
+
+        .click-btn:active {
+            transform: scale(0.92);
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+        }
+
+        .click-btn:disabled {
+            background: #374151;
+            box-shadow: none;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .players-section {
+            margin-top: 24px;
+        }
+
+        .players-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .players-list {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 3px solid transparent;
+        }
+
+        .player-item.is-me {
+            border-left-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.08);
+            font-weight: 600;
+        }
+
+        .player-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .session-id-badge {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: monospace;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .logs-section {
+            margin-top: 20px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .logs-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+            height: 90px;
+            overflow-y: auto;
+            font-family: monospace;
+            border: 1px solid var(--border-color);
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.02);
+            padding-bottom: 2px;
+        }
+
+        .log-entry:last-child {
+            margin-bottom: 0;
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: #60a5fa;
+            margin-right: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div id="setup-screen" class="card">
+            <h1>Multiplayer Game</h1>
+            <p class="subtitle">Contador em tempo real e de alta concorrência</p>
+
+            <div style="margin-bottom: 24px;">
+                <div class="form-group" id="capacity-group">
+                    <label for="max-capacity">Capacidade Máxima da Sala (Novo Jogo)</label>
+                    <input type="number" id="max-capacity" value="3" min="1" max="100">
+                </div>
+
+                <button id="btn-create-room" class="btn">Criar Novo Jogo</button>
+            </div>
+
+            <div style="border-top: 1px solid var(--border-color); padding-top: 24px;">
+                <div class="form-group">
+                    <label for="target-room-id">ID da Sala Existente</label>
+                    <input type="text" id="target-room-id" placeholder="Cole o ID da sala para entrar">
+                </div>
+                <button id="btn-join-room" class="btn btn-secondary">Entrar em Sala Existente</button>
+            </div>
+        </div>
+
+        <div id="game-screen" class="card hidden">
+            <div class="game-header">
+                <div class="room-badge" id="room-badge" title="Clique para copiar o ID">
+                    Sala: <span id="display-room-id">...</span>
+                </div>
+                <div class="status-badge status-waiting" id="game-status">
+                    <div class="pulse"></div>
+                    <span id="status-text">Aguardando...</span>
+                </div>
+            </div>
+
+            <div class="counter-section">
+                <div class="counter-label">Contador Compartilhado</div>
+                <div class="counter-value" id="counter-display">0</div>
+            </div>
+
+            <button class="click-btn" id="click-btn" disabled>CLIQUE!</button>
+
+            <div class="players-section">
+                <div class="players-header">
+                    <span>Jogadores Conectados</span>
+                    <span id="player-count-display">0/0</span>
+                </div>
+                <div class="players-list" id="players-list">
+                </div>
+            </div>
+
+            <div class="logs-section">
+                <label>Feed de Eventos da Sala</label>
+                <div class="logs-box" id="logs-box">
+                </div>
+            </div>
+
+            <button id="btn-leave" class="btn btn-secondary" style="margin-top: 20px;">Sair da Sala</button>
+        </div>
+
+    </div>
+
+    <script>
+        let clienteStomp = null;
+        let socket = null;
+        let idSalaAtual = null;
+        let meuIdSessao = null;
+        let meuNome = "";
+
+        const telaConfiguracao = document.getElementById('setup-screen');
+        const telaJogo = document.getElementById('game-screen');
+        const inputCapacidadeMaxima = document.getElementById('max-capacity');
+        const inputIdSalaAlvo = document.getElementById('target-room-id');
+        const elementoIdSala = document.getElementById('display-room-id');
+        const elementoStatusJogo = document.getElementById('game-status');
+        const elementoTextoStatus = document.getElementById('status-text');
+        const elementoContador = document.getElementById('counter-display');
+        const botaoClique = document.getElementById('click-btn');
+        const elementoListaJogadores = document.getElementById('players-list');
+        const elementoQuantidadeJogadores = document.getElementById('player-count-display');
+        const caixaLogs = document.getElementById('logs-box');
+        const badgeSala = document.getElementById('room-badge');
+
+        document.getElementById('btn-create-room').addEventListener('click', criarSala);
+        document.getElementById('btn-join-room').addEventListener('click', () => {
+            const idSala = inputIdSalaAlvo.value.trim();
+            if (!idSala) {
+                alert("Por favor, digite o ID da sala para entrar.");
+                return;
+            }
+            conectarAoWebSocket(idSala);
+        });
+        document.getElementById('btn-leave').addEventListener('click', desconectar);
+        botaoClique.addEventListener('click', enviarAcao);
+
+        badgeSala.addEventListener('click', () => {
+            if (idSalaAtual) {
+                navigator.clipboard.writeText(idSalaAtual);
+                adicionarLog("Sistema", "ID da Sala copiado para a área de transferência!");
+            }
+        });
+
+        function criarSala() {
+            const capacidadeMaxima = parseInt(inputCapacidadeMaxima.value);
+            if (isNaN(capacidadeMaxima) || capacidadeMaxima < 1) {
+                alert("Por favor, informe uma capacidade maior ou igual a 1.");
+                return;
+            }
+
+            fetch('/rooms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ capacidadeMaxima: capacidadeMaxima })
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error("Falha ao criar sala.");
+                    return res.json();
+                })
+                .then(dados => {
+                    conectarAoWebSocket(dados.idSala);
+                })
+                .catch(err => {
+                    alert(err.message);
+                });
+        }
+
+        function conectarAoWebSocket(idSala) {
+            meuNome = "Jogador_" + Math.random().toString(36).substring(2, 6);
+
+            document.getElementById('btn-create-room').disabled = true;
+            document.getElementById('btn-join-room').disabled = true;
+
+            socket = new SockJS('/ws-game');
+            clienteStomp = Stomp.over(socket);
+            clienteStomp.debug = null;
+
+            clienteStomp.connect({ playerName: meuNome }, function (frame) {
+                idSalaAtual = idSala;
+
+                const partesUrl = socket._transport.url.split("/");
+                meuIdSessao = partesUrl[partesUrl.length - 2];
+
+                clienteStomp.subscribe('/topic/rooms/' + idSala, function (mensagem) {
+                    const evento = JSON.parse(mensagem.body);
+                    tratarEventoJogo(evento);
+                });
+
+                carregarEstadoInicial(idSala);
+
+                telaConfiguracao.classList.add('hidden');
+                telaJogo.classList.remove('hidden');
+                elementoIdSala.textContent = idSala;
+                botaoClique.disabled = false;
+
+                adicionarLog("Sistema", "Conectado com sucesso à sala!");
+
+            }, function (erro) {
+                document.getElementById('btn-create-room').disabled = false;
+                document.getElementById('btn-join-room').disabled = false;
+
+                let mensagemErro = "Não foi possível conectar ou a sala está cheia.";
+                if (erro && erro.headers && erro.headers.message) {
+                    mensagemErro = erro.headers.message;
+                }
+                alert("Erro: " + mensagemErro);
+                desconectar();
+            });
+        }
+
+        function carregarEstadoInicial(idSala) {
+            fetch('/rooms/' + idSala)
+                .then(res => {
+                    if (!res.ok) throw new Error("Erro ao buscar detalhes da sala.");
+                    return res.json();
+                })
+                .then(dados => {
+                    atualizarListaJogadores(dados.jogadores, dados.capacidadeMaxima);
+                    atualizarContador(dados.estadoJogo.contador);
+                    atualizarStatusJogo(dados.estadoJogo.iniciado);
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+        }
+
+        function tratarEventoJogo(evento) {
+            const tipo = evento.tipo;
+            const dados = evento.dados;
+
+            switch (tipo) {
+                case 'JOGADOR_ENTROU_SALA':
+                    adicionarLog("Conexão", `Jogador "${dados.nome}" entrou na sala.`);
+                    break;
+                case 'JOGADOR_SAIU_SALA':
+                    adicionarLog("Desconexão", `Jogador "${dados.nome}" saiu da sala.`);
+                    break;
+                case 'JOGO_INICIADO':
+                    adicionarLog("Partida", "O jogo começou! A capacidade máxima da sala foi preenchida.");
+                    atualizarStatusJogo(true);
+                    break;
+                case 'ACAO_JOGADOR':
+                    adicionarLog("Ação", `Jogador "${dados.nome}" clicou!`);
+                    animarContador();
+                    break;
+                case 'ESTADO_JOGO_ALTERADO':
+                    atualizarContador(dados.contador);
+                    atualizarStatusJogo(dados.iniciado);
+                    if (idSalaAtual) {
+                        fetch('/rooms/' + idSalaAtual)
+                            .then(res => res.json())
+                            .then(dados => atualizarListaJogadores(dados.jogadores, dados.capacidadeMaxima));
+                    }
+                    break;
+            }
+        }
+
+        function enviarAcao() {
+            if (idSalaAtual && clienteStomp) {
+                clienteStomp.send("/app/rooms/" + idSalaAtual + "/action", {});
+            }
+        }
+
+        function desconectar() {
+            if (clienteStomp) {
+                clienteStomp.disconnect();
+            }
+            clienteStomp = null;
+            socket = null;
+            idSalaAtual = null;
+            meuIdSessao = null;
+
+            telaConfiguracao.classList.remove('hidden');
+            telaJogo.classList.add('hidden');
+            document.getElementById('btn-create-room').disabled = false;
+            document.getElementById('btn-join-room').disabled = false;
+
+            elementoContador.textContent = "0";
+            elementoListaJogadores.innerHTML = "";
+            caixaLogs.innerHTML = "";
+            atualizarStatusJogo(false);
+        }
+
+        function atualizarContador(valor) {
+            elementoContador.textContent = valor;
+        }
+
+        function animarContador() {
+            elementoContador.classList.add('bump');
+            setTimeout(() => {
+                elementoContador.classList.remove('bump');
+            }, 100);
+        }
+
+        function atualizarStatusJogo(iniciado) {
+            if (iniciado) {
+                elementoStatusJogo.className = "status-badge status-started";
+                elementoTextoStatus.textContent = "Jogo Iniciado";
+            } else {
+                elementoStatusJogo.className = "status-badge status-waiting";
+                elementoTextoStatus.textContent = "Aguardando";
+            }
+        }
+
+        function atualizarListaJogadores(jogadores, capacidadeMaxima) {
+            elementoListaJogadores.innerHTML = "";
+            elementoQuantidadeJogadores.textContent = `${jogadores.length}/${capacidadeMaxima}`;
+
+            jogadores.forEach(j => {
+                const item = document.createElement('div');
+                item.className = "player-item";
+
+                if (j.idSessao === meuIdSessao) {
+                    item.className += " is-me";
+                }
+
+                item.innerHTML = `
+                    <span>${j.nome} ${j.idSessao === meuIdSessao ? '(Você)' : ''}</span>
+                    <span class="session-id-badge">${j.idSessao.substring(0, 8)}...</span>
+                `;
+                elementoListaJogadores.appendChild(item);
+            });
+        }
+
+        function adicionarLog(tipo, mensagem) {
+            const entrada = document.createElement('div');
+            entrada.className = "log-entry";
+
+            const agora = new Date();
+            const stringTempo = agora.toTimeString().split(' ')[0];
+
+            entrada.innerHTML = `
+                <span class="log-time">[${stringTempo}]</span>
+                <strong>[${tipo}]</strong> ${mensagem}
+            `;
+
+            caixaLogs.appendChild(entrada);
+            caixaLogs.scrollTop = caixaLogs.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>

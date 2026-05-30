@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.mateusesp.game: DEBUG
+    org.springframework.web.socket: INFO
